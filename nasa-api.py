@@ -1,44 +1,42 @@
-import os
 import requests
-from dotenv import load_dotenv
 
-load_dotenv()
-NASA_API_KEY = os.getenv("NASA_API_KEY")
-BASE_URL = "https://images-api.nasa.gov"
-headers = {
-    "User-Agent": "Mozilla/5.0",
-}
-# telescope_keywords = ['Hubble', 'Spitzer', 'Chandra', 'James Webb', 'Kepler']
+BASE_URL = "https://skyview.gsfc.nasa.gov/current/cgi/query.pl"
 
-def fetch_nasa_images(query):
-    url = f"{BASE_URL}/search"
-    telescope_images_query = f"Hubble"
+def fetch_nasa_images(ra, dec, survey='DSS', width=0.5, height=0.5):
+    """
+    Parameters:
+    ra (float): Right Ascension of the target location.
+    dec (float): Declination of the target location.
+    survey (str): type of the image (default is 'DSS') - DSS/SDSS/2MASS/WISE.
+    width (float): Width of the image in degrees (default is 0.5).
+    height (float): Height of the image in degrees (default is 0.5).
+    """
     params = {
-        "media_type": "image",
-        "q": telescope_images_query,
+        "Position": f"{ra},{dec}",
+        "Survey": survey,
+        "Coordinates": "J2000",
+        "Return": "URL",
+        "Scaling": "Log",
+        "Sampler": "Clip",
+        "Size": f"{width},{height}",
+        "pixels": "300,300"
     }
 
     try:
-        response = requests.get(url, params=params, headers=headers)
+        response = requests.get(BASE_URL, params=params)
         response.raise_for_status()
-        data = response.json()
-        
-        image_urls = []
-        for item in data["collection"]["items"]:
-            image_urls.append(item["links"][0]["href"])
-        
-        return image_urls
+        return response.text.strip()
     except Exception as err:
         print(f"Error fetching NASA images: {err}")
         return []
 
 if __name__ == "__main__":
-    query = ""
-    image_urls = fetch_nasa_images(query)
+    # Coordinates for the center of the Orion Nebula
+    ra = 83.8221
+    dec = -5.3911
+    image_url = fetch_nasa_images(ra, dec)
 
-    if image_urls:
-        print(f"Found {len(image_urls)} images related to '{query}':")
-        for url in image_urls:
-            print(url)
+    if image_url:
+        print(f"Image URL: {image_url}")
     else:
-        print(f"No images found for '{query}'")
+        print("Failed to retrieve the image.")
