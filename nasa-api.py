@@ -1,42 +1,53 @@
-import requests
+import subprocess
+import datetime
 
-BASE_URL = "https://skyview.gsfc.nasa.gov/current/cgi/query.pl"
+import numpy as np
+from astropy.io import fits
+import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter
 
-def fetch_nasa_images(ra, dec, survey='DSS', width=0.5, height=0.5):
-    """
-    Parameters:
-    ra (float): Right Ascension of the target location.
-    dec (float): Declination of the target location.
-    survey (str): type of the image (default is 'DSS') - DSS/SDSS/2MASS/WISE.
-    width (float): Width of the image in degrees (default is 0.5).
-    height (float): Height of the image in degrees (default is 0.5).
-    """
-    params = {
-        "Position": f"{ra},{dec}",
-        "Survey": survey,
-        "Coordinates": "J2000",
-        "Return": "URL",
-        "Scaling": "Log",
-        "Sampler": "Clip",
-        "Size": f"{width},{height}",
-        "pixels": "300,300"
-    }
+def fetch_nasa_image(ra, dec, survey='dss'):
+    position = f'{ra},{dec}'
+    size = '2.0,2.0'
+    output_file = f'output_{survey}_{timestamp}.fits'
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    command = [
+        'java', '-jar', 'skyview.jar',
+        f'position={position}',
+        f'survey={survey}',
+        f'size={size}',
+        f'output={output_file}'
+    ]
 
     try:
-        response = requests.get(BASE_URL, params=params)
-        response.raise_for_status()
-        return response.text.strip()
+        subprocess.run(command, check=True)
+        print(f'Image successfully generated and saved as {output_file}')
+        return output_file
     except Exception as err:
         print(f"Error fetching NASA images: {err}")
-        return []
+        return None
+
+def enhance_galaxies(image_data):
+    smoothed_image = gaussian_filter(image_data, sigma=3.0)
+    # Subtract the smoothed image from the original to enhance galaxies
+    galaxy_enhanced = image_data - smoothed_image
+    # Apply logarithmic scaling to enhance faint features
+    galaxy_enhanced = np.log10(galaxy_enhanced + 1.0) # Adding 1 to avoid log(0)
+    # Normalize to range [0, 1]
+    galaxy_enhanced = (galaxy_enhanced - np.min(galaxy_enhanced)) / (np.max(galaxy_enhanced) - np.min(galaxy_enhanced))
+    return galaxy_enhanced
+
+def view_images():
+    hdul = fits.open('output.fits')
+    image_data = hdul[0].data
+    # image_data = enhance_galaxies(image_data)
+    plt.figure(figsize=(8, 8))
+    plt.imshow(image_data, cmap='gray', origin='lower')
+    plt.colorbar()
+    plt.show()
 
 if __name__ == "__main__":
-    # Coordinates for the center of the Orion Nebula
-    ra = 83.8221
-    dec = -5.3911
-    image_url = fetch_nasa_images(ra, dec)
-
-    if image_url:
-        print(f"Image URL: {image_url}")
-    else:
-        print("Failed to retrieve the image.")
+    ra = 12.514
+    dec = 12.393
+    fetch_nasa_image(ra, dec)
+    view_images()
