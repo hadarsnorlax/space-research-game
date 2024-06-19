@@ -1,3 +1,7 @@
 astropy
 matplotlib
 scipy
+pythreejs
+IPython
+PyQt5
+PyQtWebEngine 
